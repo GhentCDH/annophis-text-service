@@ -9,7 +9,7 @@
 *.dylib
 
 # the build itself
-annophis-text-service
+/annophis-text-service
 
 # Go module files (auto-managed)
 go.sum
