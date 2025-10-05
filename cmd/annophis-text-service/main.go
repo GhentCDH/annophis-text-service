@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	srv "annophistextservice/internal/server"
+	srv "github.com/ThomasK81/annophis-text-service/internal/server"
 )
 
 func main() {
