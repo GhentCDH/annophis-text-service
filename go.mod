@@ -1,4 +1,4 @@
-module github.com/ThomasK81/annophis-text-service
+module github.com/GhentCDH/annophis-text-service
 
 go 1.25
 
