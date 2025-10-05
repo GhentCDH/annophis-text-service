@@ -1,0 +1,19 @@
+# Go build/cache
+bin/
+build/
+dist/
+*.test
+*.out
+
+# VCS & editor
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# OS cruft
+.DS_Store
+
+# Modules cache (let Docker layer cache handle mod download)
+**/*.swp
+

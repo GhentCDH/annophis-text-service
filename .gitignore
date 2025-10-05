@@ -1,0 +1,57 @@
+# Build artefacts
+/bin/
+/dist/
+/build/
+*.exe
+*.out
+*.dll
+*.so
+*.dylib
+
+# the build itself
+annophis-text-service
+
+# Go module files (auto-managed)
+go.sum
+
+# Local environment files
+.env
+.env.*
+*.local
+
+# Editor and IDE clutter
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+*~
+
+# Logs and runtime data
+*.log
+*.pid
+*.seed
+*.tmp
+*.cache/
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+*.tar
+*.img
+
+# Tests and coverage
+coverage.out
+coverage.txt
+*.test
+
+# Config and runtime data
+config.json
+testdata/
+tmp/
+data/
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
