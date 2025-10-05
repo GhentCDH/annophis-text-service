@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/GhentCDH/annophis-text-service)](https://goreportcard.com/report/github.com/GhentCDH/annophis-text-service)
+
 # annophis-text-service
 
 A tiny HTTP service for exposing **CTS/CEX** texts with a modern API, written in Go (Chi router).
