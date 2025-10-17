@@ -30,6 +30,8 @@ This project is a **modernisation** of the CITE Architecture’s microservices: 
 ### Build & run (local)
 
 ```bash
+# Make sure dependencies are met
+make tidy
 # build binary to ./bin
 make build
 
