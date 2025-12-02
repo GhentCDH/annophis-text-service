@@ -170,10 +170,10 @@ func BuildRouter(s *Server) http.Handler {
 	// Base (no explicit CEX) — uses pickSource fallback logic
 	r.Get("/texts", s.handleWorkURNs)
 	r.Get("/texts/catalog", s.handleCatalog)
-	r.Get("/texts/first/{URN}", s.handleFirst)
-	r.Get("/texts/last/{URN}", s.handleLast)
-	r.Get("/texts/previous/{URN}", s.handlePrev)
-	r.Get("/texts/next/{URN}", s.handleNext)
+	r.Get("/texts/first/{URN}", s.handleNavFirst)
+	r.Get("/texts/last/{URN}", s.handleNavLast)
+	r.Get("/texts/previous/{URN}", s.handleNavPrevious)
+	r.Get("/texts/next/{URN}", s.handleNavNext)
 	r.Get("/texts/urns/{URN}", s.handleURNs)
 	r.Get("/texts/{URN}", s.handlePassage)
 
@@ -181,10 +181,10 @@ func BuildRouter(s *Server) http.Handler {
 	r.Route("/{CEX}", func(r chi.Router) {
 		r.Get("/texts", s.handleWorkURNs)
 		r.Get("/texts/catalog", s.handleCatalog)
-		r.Get("/texts/first/{URN}", s.handleFirst)
-		r.Get("/texts/last/{URN}", s.handleLast)
-		r.Get("/texts/previous/{URN}", s.handlePrev)
-		r.Get("/texts/next/{URN}", s.handleNext)
+		r.Get("/texts/first/{URN}", s.handleNavFirst)
+		r.Get("/texts/last/{URN}", s.handleNavLast)
+		r.Get("/texts/previous/{URN}", s.handleNavPrevious)
+		r.Get("/texts/next/{URN}", s.handleNavNext)
 		r.Get("/texts/urns/{URN}", s.handleURNs)
 		r.Get("/texts/{URN}", s.handlePassage)
 	})
@@ -217,11 +217,4 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
-}
-
-func servicePathFirstLast(first bool) string {
-	if first {
-		return "/texts/first"
-	}
-	return "/texts/last"
 }

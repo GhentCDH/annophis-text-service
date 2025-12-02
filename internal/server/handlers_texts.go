@@ -88,7 +88,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		node := Node{
 			URN:      []string{baseURN},
 			Text:     []string{textOut},
-			Sequence: idx + 1,
+			Sequence: sequenceWithinWork(allURNs, idx),
 			Complete: complete,
 		}
 		attachNeighbors(&node, allURNs, idx)
@@ -114,7 +114,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		node := Node{
 			URN:      []string{allURNs[idx]},
 			Text:     []string{txt},
-			Sequence: idx + 1,
+			Sequence: sequenceWithinWork(allURNs, idx),
 			Complete: complete,
 		}
 		attachNeighbors(&node, allURNs, idx)
@@ -354,5 +354,146 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, NodeResponse{
 		RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: nodes,
+	})
+}
+
+func (s *Server) handleNavFirst(w http.ResponseWriter, r *http.Request) {
+	s.handleNav(w, r, "first")
+}
+
+func (s *Server) handleNavLast(w http.ResponseWriter, r *http.Request) {
+	s.handleNav(w, r, "last")
+}
+
+func (s *Server) handleNavPrevious(w http.ResponseWriter, r *http.Request) {
+	s.handleNav(w, r, "previous")
+}
+
+func (s *Server) handleNavNext(w http.ResponseWriter, r *http.Request) {
+	s.handleNav(w, r, "next")
+}
+
+func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
+	ctx := r.Context()
+	cexName := chi.URLParam(r, "CEX")
+	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
+	reqURN := chi.URLParam(r, "URN")
+	svc := "/texts"
+
+	// validate URN
+	if !cite.IsCTSURN(reqURN) {
+		writeJSON(w, http.StatusBadRequest, NodeResponse{
+			RequestUrn: []string{reqURN},
+			Status:     "Exception",
+			Service:    svc,
+			Message:    reqURN + " is not valid CTS.",
+		})
+		return
+	}
+
+	// Load data
+	allURNs, allTexts, err := s.parseCTSData(ctx, source)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, NodeResponse{
+			RequestUrn: []string{reqURN},
+			Status:     "Exception",
+			Service:    svc,
+			Message:    "No results for " + reqURN,
+		})
+		return
+	}
+
+	var idx int = -1
+
+	switch nav {
+	case "first":
+		stem := workStem(reqURN)
+		for i, u := range allURNs {
+			if strings.HasPrefix(u, stem) {
+				idx = i
+				break
+			}
+		}
+	case "last":
+		stem := workStem(reqURN)
+		for i := len(allURNs) - 1; i >= 0; i-- {
+			if strings.HasPrefix(allURNs[i], stem) {
+				idx = i
+				break
+			}
+		}
+	case "previous":
+		cur := indexOf(allURNs, reqURN)
+		if cur < 0 {
+			writeJSON(w, http.StatusOK, NodeResponse{
+				RequestUrn: []string{reqURN},
+				Status:     "Exception",
+				Service:    svc,
+				Message:    "Current passage not found.",
+			})
+			return
+		}
+		if cur == 0 || !sameWork(allURNs[cur-1], reqURN) {
+			// no previous in same work
+			writeJSON(w, http.StatusOK, NodeResponse{
+				RequestUrn: []string{reqURN},
+				Status:     "Exception",
+				Service:    svc,
+				Message:    "No previous passage in this work.",
+			})
+			return
+		}
+		idx = cur - 1
+
+	case "next":
+		cur := indexOf(allURNs, reqURN)
+		if cur < 0 {
+			writeJSON(w, http.StatusOK, NodeResponse{
+				RequestUrn: []string{reqURN},
+				Status:     "Exception",
+				Service:    svc,
+				Message:    "Current passage not found.",
+			})
+			return
+		}
+		if cur+1 >= len(allURNs) || !sameWork(allURNs[cur+1], reqURN) {
+			// no next in same work
+			writeJSON(w, http.StatusOK, NodeResponse{
+				RequestUrn: []string{reqURN},
+				Status:     "Exception",
+				Service:    svc,
+				Message:    "No next passage in this work.",
+			})
+			return
+		}
+		idx = cur + 1
+	}
+
+	if idx < 0 || idx >= len(allURNs) {
+		writeJSON(w, http.StatusOK, NodeResponse{
+			RequestUrn: []string{reqURN},
+			Status:     "Exception",
+			Service:    svc,
+			Message:    "Navigation target not found.",
+		})
+		return
+	}
+
+	txt := allTexts[idx]
+	txt, complete := applyTextFilters(r, txt)
+
+	node := Node{
+		URN:      []string{allURNs[idx]},
+		Text:     []string{txt},
+		Sequence: sequenceWithinWork(allURNs, idx),
+		Complete: complete,
+	}
+	attachNeighbors(&node, allURNs, idx)
+
+	writeJSON(w, http.StatusOK, NodeResponse{
+		RequestUrn: []string{reqURN},
+		Status:     "Success",
+		Service:    svc,
+		Nodes:      []Node{node},
 	})
 }

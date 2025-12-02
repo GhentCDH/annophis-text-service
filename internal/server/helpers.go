@@ -1,6 +1,7 @@
 package server
 
 import (
+	"golang.org/x/text/unicode/norm"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -9,16 +10,34 @@ import (
 	cite "github.com/ThomasK81/gocite"
 )
 
-// --------- small util funcs shared across handlers ---------
+// workStem returns the 4-part CTS work stem with trailing colon,
+// e.g. urn:cts:greekLit:tlg0007.tlg012.ziegler:
+func workStem(u string) string {
+	parts := strings.Split(u, ":")
+	if len(parts) < 4 {
+		return u
+	}
+	return strings.Join(parts[:4], ":") + ":"
+}
 
-func neighboursIDsIn(ids []string, i int) (prev, next string) {
-	if i > 0 {
-		prev = ids[i-1]
+// sameWork reports whether two URNs belong to the same work stem.
+func sameWork(a, b string) bool {
+	return strings.HasPrefix(a, workStem(b))
+}
+
+// sequenceWithinWork returns a 1-based index of ids[idx] within its work.
+func sequenceWithinWork(ids []string, idx int) int {
+	if idx < 0 || idx >= len(ids) {
+		return 0
 	}
-	if i+1 < len(ids) {
-		next = ids[i+1]
+	stem := workStem(ids[idx])
+	seq := 0
+	for i := 0; i <= idx; i++ {
+		if strings.HasPrefix(ids[i], stem) {
+			seq++
+		}
 	}
-	return
+	return seq
 }
 
 func firstPrefixIndex(ids []string, prefix string) int {
@@ -106,12 +125,19 @@ func buildWorkForStem(allURNs []string, stem string) cite.Work {
 }
 
 func attachNeighbors(n *Node, ids []string, idx int) {
-	prevID, nextID := neighboursIDsIn(ids, idx)
-	if prevID != "" {
-		n.Previous = []string{prevID}
+	if idx < 0 || idx >= len(ids) {
+		return
 	}
-	if nextID != "" {
-		n.Next = []string{nextID}
+	current := ids[idx]
+
+	// previous in same work only
+	if idx > 0 && sameWork(ids[idx-1], current) {
+		n.Previous = []string{ids[idx-1]}
+	}
+
+	// next in same work only
+	if idx+1 < len(ids) && sameWork(ids[idx+1], current) {
+		n.Next = []string{ids[idx+1]}
 	}
 }
 
@@ -261,25 +287,44 @@ func anchorWindowFromRuneOffsets(r *http.Request, rns []rune, startRune, endRune
 
 // "urn:...:<ref>@needle[n]" → (base, needle, occ, ok)
 func parseAnchoredURN(u string) (string, string, int, bool) {
+	// Ensure we work on a decoded string, even if the client passes %CE%... manually
+	if dec, err := url.PathUnescape(u); err == nil {
+		u = dec
+	}
+
 	at := strings.LastIndex(u, "@")
 	if at < 0 {
 		return "", "", 0, false
 	}
-	base := u[:at]
-	rest := u[at+1:]
+
+	base := strings.TrimSpace(u[:at])
+	rest := strings.TrimSpace(u[at+1:])
+
+	if rest == "" {
+		return "", "", 0, false
+	}
+
 	occ := 1
 	needle := rest
+
+	// optional [n] suffix
 	if lb := strings.LastIndex(rest, "["); lb >= 0 && strings.HasSuffix(rest, "]") {
-		needle = rest[:lb]
 		nStr := rest[lb+1 : len(rest)-1]
 		if n, err := strconv.Atoi(strings.TrimSpace(nStr)); err == nil && n >= 1 {
 			occ = n
 		}
+		needle = rest[:lb]
 	}
+
 	needle = strings.TrimSpace(needle)
 	if needle == "" {
 		return "", "", 0, false
 	}
+
+	// Normalise both base and needle so they match the NFC text we stored
+	base = norm.NFC.String(base)
+	needle = norm.NFC.String(needle)
+
 	return base, needle, occ, true
 }
 
@@ -288,34 +333,31 @@ func findNthInsensitive(haystack, needle string, n int) (int, int) {
 	if n < 1 || needle == "" {
 		return -1, -1
 	}
-	hl := strings.ToLower(haystack)
-	nl := strings.ToLower(needle)
-	bytePos := 0
-	for i := 0; i < n; i++ {
-		idx := strings.Index(hl[bytePos:], nl)
-		if idx < 0 {
-			return -1, -1
-		}
-		bytePos += idx
-		if i < n-1 {
-			bytePos += len(nl)
+
+	hr := []rune(haystack)
+	nr := []rune(needle)
+
+	hl := len(hr)
+	nl := len(nr)
+
+	if nl == 0 || nl > hl {
+		return -1, -1
+	}
+
+	occ := 0
+
+	for i := 0; i <= hl-nl; i++ {
+		sub := string(hr[i : i+nl])
+		if strings.EqualFold(sub, needle) { // Unicode-aware case-fold
+			occ++
+			if occ == n {
+				// i is startRune, i+nl is endRune in the ORIGINAL string
+				return i, i + nl
+			}
 		}
 	}
-	runes := []rune(haystack)
-	cb := 0
-	startRune := 0
-	for i, r := range runes {
-		cb += len(string(r))
-		if cb > bytePos {
-			startRune = i
-			break
-		}
-	}
-	endRune := startRune + len([]rune(needle))
-	if endRune > len(runes) {
-		endRune = len(runes)
-	}
-	return startRune, endRune
+
+	return -1, -1
 }
 
 // range tokens like "1.0@foo[1]" → (ref, needle, occ, anchored)
@@ -325,6 +367,11 @@ func parseRefAnchorToken(tok string) (ref, needle string, occ int, anchored bool
 	if tok == "" {
 		return "", "", 1, false
 	}
+
+	if dec, err := url.PathUnescape(tok); err == nil {
+		tok = dec
+	}
+
 	at := strings.Index(tok, "@")
 	if at < 0 {
 		return tok, "", 1, false

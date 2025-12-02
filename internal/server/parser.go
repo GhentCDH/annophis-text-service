@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
+	"golang.org/x/text/unicode/norm"
 	"regexp"
 	"strings"
 )
@@ -50,8 +51,9 @@ func (s *Server) parseCTSData(ctx context.Context, source string) (urns, texts [
 			}
 			continue
 		}
+		text := norm.NFC.String(line[1])
 		urns = append(urns, strings.TrimSpace(line[0]))
-		texts = append(texts, line[1])
+		texts = append(texts, text)
 	}
 	return urns, texts, nil
 }
