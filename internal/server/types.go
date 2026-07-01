@@ -30,15 +30,41 @@ type Node struct {
 	Next     []string `json:"next,omitempty"`
 	Sequence int      `json:"sequence"`
 	Complete bool     `json:"complete"`
+	Hash     string   `json:"hash,omitempty"` // set when ?hash=true
 }
 
 type NodeResponse struct {
-	RequestUrn []string `json:"requestUrn"`
-	Status     string   `json:"status"`
-	Service    string   `json:"service"`
-	Message    string   `json:"message,omitempty"`
-	URN        []string `json:"urns,omitempty"`
-	Nodes      []Node   `json:"nodes,omitempty"`
+	RequestUrn []string    `json:"requestUrn"`
+	Status     string      `json:"status"`
+	Service    string      `json:"service"`
+	Message    string      `json:"message,omitempty"`
+	URN        []string    `json:"urns,omitempty"`
+	Nodes      []Node      `json:"nodes,omitempty"`
+	Meta       *SourceMeta `json:"meta,omitempty"` // set when ?meta=true
+}
+
+// SourceMeta is provenance for a resolved passage, derived from the CEX source
+// and its #!ctscatalog entry.
+type SourceMeta struct {
+	Source       string `json:"source,omitempty"`
+	GroupName    string `json:"groupName,omitempty"`
+	WorkTitle    string `json:"workTitle,omitempty"`
+	VersionLabel string `json:"versionLabel,omitempty"`
+}
+
+// NodeHash is a per-node content hash returned by /texts/hash/{URN}.
+type NodeHash struct {
+	URN  string `json:"urn"`
+	Hash string `json:"hash"`
+}
+
+type HashResponse struct {
+	RequestUrn []string   `json:"requestUrn"`
+	Status     string     `json:"status"`
+	Service    string     `json:"service"`
+	Message    string     `json:"message,omitempty"`
+	Algorithm  string     `json:"algorithm,omitempty"`
+	Hashes     []NodeHash `json:"hashes,omitempty"`
 }
 
 type URNResponse struct {

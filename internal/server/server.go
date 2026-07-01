@@ -175,6 +175,7 @@ func BuildRouter(s *Server) http.Handler {
 	r.Get("/texts/previous/{URN}", s.handleNavPrevious)
 	r.Get("/texts/next/{URN}", s.handleNavNext)
 	r.Get("/texts/urns/{URN}", s.handleURNs)
+	r.Get("/texts/hash/{URN}", s.handleHash)
 	r.Get("/texts/{URN}", s.handlePassage)
 
 	// With {CEX} directory base
@@ -186,6 +187,7 @@ func BuildRouter(s *Server) http.Handler {
 		r.Get("/texts/previous/{URN}", s.handleNavPrevious)
 		r.Get("/texts/next/{URN}", s.handleNavNext)
 		r.Get("/texts/urns/{URN}", s.handleURNs)
+		r.Get("/texts/hash/{URN}", s.handleHash)
 		r.Get("/texts/{URN}", s.handlePassage)
 	})
 

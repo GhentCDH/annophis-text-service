@@ -24,8 +24,14 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if _, ok := hashAlgo(r); parseBool(r.URL.Query().Get("hash")) && !ok {
+		writeJSON(w, http.StatusBadRequest, NodeResponse{
+			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
+			Message: "Unsupported algorithm value. Use one of: sha1, sha256.",
+		})
+		return
+	}
 
-	// Load data
 	allURNs, allTexts, err := s.parseCTSData(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, NodeResponse{
@@ -34,27 +40,54 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	nodes, errResp, errStatus := s.resolveNodes(r, allURNs, allTexts, reqURN, svc)
+	if errResp != nil {
+		writeJSON(w, errStatus, *errResp)
+		return
+	}
+
+	// Normalize the resolved text (nfc default) before hashing/serving so the
+	// returned text and its hash always correspond.
+	mode, _ := normalizeMode(r)
+	applyNormalization(mode, nodes)
+
+	if parseBool(r.URL.Query().Get("hash")) {
+		algo, _ := hashAlgo(r)
+		for i := range nodes {
+			nodes[i].Hash = hashHex(algo, strings.Join(nodes[i].Text, ""))
+		}
+	}
+
+	resp := NodeResponse{RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: nodes}
+	if parseBool(r.URL.Query().Get("meta")) {
+		resp.Meta = s.sourceMeta(ctx, source, nodes)
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// resolveNodes resolves reqURN (exact / prefix / range / anchored) to its result
+// nodes, applying the request's text filters. On success it returns the nodes
+// (with NFC-baseline text, before any ?normalize= transform). On failure it
+// returns a ready-to-write exception response and its HTTP status; nodes is nil.
+func (s *Server) resolveNodes(r *http.Request, allURNs, allTexts []string, reqURN, svc string) ([]Node, *NodeResponse, int) {
 	// --- Anchored (single)
 	if cite.WantSubstr(reqURN) && !cite.IsRange(reqURN) {
 		baseURN, needle, occ, ok := parseAnchoredURN(reqURN)
 		if !ok {
-			writeJSON(w, http.StatusBadRequest, NodeResponse{
+			return nil, &NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Malformed anchored URN.",
-			})
-			return
+			}, http.StatusBadRequest
 		}
 		if !cite.IsCTSURN(baseURN) {
-			writeJSON(w, http.StatusBadRequest, NodeResponse{
+			return nil, &NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: baseURN + " is not valid CTS.",
-			})
-			return
+			}, http.StatusBadRequest
 		}
 		idx := indexOf(allURNs, baseURN)
 		if idx < 0 {
-			writeNodes(w, r, http.StatusOK, NodeResponse{
+			return nil, &NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not find base passage " + baseURN,
-			})
-			return
+			}, http.StatusOK
 		}
 		full := allTexts[idx]
 
@@ -64,18 +97,16 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			pat := strings.TrimSuffix(strings.TrimPrefix(needle, "/"), "/")
 			re, err := regexp.Compile("(?i)" + pat)
 			if err != nil {
-				writeJSON(w, http.StatusBadRequest, NodeResponse{
+				return nil, &NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Invalid regex pattern.",
-				})
-				return
+				}, http.StatusBadRequest
 			}
 			matches := re.FindAllStringIndex(full, -1)
 			if occ < 1 || occ > len(matches) {
-				writeNodes(w, r, http.StatusOK, NodeResponse{
+				return nil, &NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("Regex %q (occurrence %d) not found in %s.", pat, occ, baseURN),
-				})
-				return
+				}, http.StatusOK
 			}
 			start := matches[occ-1][0]
 			end := matches[occ-1][1]
@@ -83,11 +114,10 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		} else {
 			startRune, endRune := findAnchorMatch(r, full, needle, occ)
 			if startRune < 0 {
-				writeNodes(w, r, http.StatusOK, NodeResponse{
+				return nil, &NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("Substring %q (occurrence %d) not found in %s.", needle, occ, baseURN),
-				})
-				return
+				}, http.StatusOK
 			}
 			rns := []rune(full)
 			textOut, complete = anchorWindowFromRuneOffsets(r, rns, startRune, endRune)
@@ -100,19 +130,14 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			Complete: complete,
 		}
 		attachNeighbors(&node, allURNs, idx)
-
-		writeNodes(w, r, http.StatusOK, NodeResponse{
-			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: []Node{node},
-		})
-		return
+		return []Node{node}, nil, 0
 	}
 
 	// Validate CTS/range
 	if !cite.IsCTSURN(reqURN) && !cite.IsRange(reqURN) {
-		writeJSON(w, http.StatusBadRequest, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: reqURN + " is not valid CTS.",
-		})
-		return
+		}, http.StatusBadRequest
 	}
 
 	// --- Exact node
@@ -126,10 +151,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			Complete: complete,
 		}
 		attachNeighbors(&node, allURNs, idx)
-		writeNodes(w, r, http.StatusOK, NodeResponse{
-			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: []Node{node},
-		})
-		return
+		return []Node{node}, nil, 0
 	}
 
 	// --- Prefix expansion (non-range)
@@ -149,33 +171,27 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(nodes) == 0 {
-			writeNodes(w, r, http.StatusOK, NodeResponse{
+			return nil, &NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not find node to " + reqURN + " in source.",
-			})
-			return
+			}, http.StatusOK
 		}
-		writeNodes(w, r, http.StatusOK, NodeResponse{
-			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: nodes,
-		})
-		return
+		return nodes, nil, 0
 	}
 
 	// --- Range (supports anchors on both sides)
 	parts := strings.Split(reqURN, ":")
 	if len(parts) < 5 {
-		writeNodes(w, r, http.StatusOK, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not parse " + reqURN,
-		})
-		return
+		}, http.StatusOK
 	}
 	stem := strings.Join(parts[:4], ":") + ":"
 	rangeRef := parts[4]
 	dash := strings.Index(rangeRef, "-")
 	if dash <= 0 || dash >= len(rangeRef)-1 {
-		writeNodes(w, r, http.StatusOK, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not parse range " + reqURN,
-		})
-		return
+		}, http.StatusOK
 	}
 	leftTok := rangeRef[:dash]
 	rightTok := rangeRef[dash+1:]
@@ -195,10 +211,9 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(fURNs) == 0 {
-		writeNodes(w, r, http.StatusOK, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not find node to " + reqURN + " in source.",
-		})
-		return
+		}, http.StatusOK
 	}
 
 	startID := stem + lRef
@@ -218,19 +233,17 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		full := fTexts[sIdx]
 		startRune, endRuneStart := findAnchorMatch(r, full, lNeedle, lOcc)
 		if startRune < 0 {
-			writeNodes(w, r, http.StatusOK, NodeResponse{
+			return nil, &NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 				Message: fmt.Sprintf("Start anchor %q (occurrence %d) not found in %s.", lNeedle, lOcc, stem+lRef),
-			})
-			return
+			}, http.StatusOK
 		}
 		erS, erE := findAnchorMatch(r, full, rNeedle, rOcc)
 		if erS < 0 || erS < endRuneStart {
-			writeNodes(w, r, http.StatusOK, NodeResponse{
+			return nil, &NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 				Message: fmt.Sprintf("End anchor %q (occurrence %d) not found after start in %s.", rNeedle, rOcc, stem+lRef),
-			})
-			return
+			}, http.StatusOK
 		}
 		rns := []rune(full)
 		txt, complete := sliceBetweenRunes(rns, startRune, erE)
@@ -241,29 +254,23 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			Complete: complete,
 		}
 		attachNeighbors(&node, fURNs, sIdx)
-		writeNodes(w, r, http.StatusOK, NodeResponse{
-			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: []Node{node},
-		})
-		return
+		return []Node{node}, nil, 0
 	}
 
 	if sIdx < 0 {
-		writeNodes(w, r, http.StatusOK, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Start of range not found.",
-		})
-		return
+		}, http.StatusOK
 	}
 	if rRef != "" && eIdx < 0 {
-		writeNodes(w, r, http.StatusOK, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "End of range not found.",
-		})
-		return
+		}, http.StatusOK
 	}
 	if !rAnch && rRef == "" {
-		writeNodes(w, r, http.StatusOK, NodeResponse{
+		return nil, &NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Right side of range missing.",
-		})
-		return
+		}, http.StatusOK
 	}
 	if eIdx >= 0 && sIdx > eIdx {
 		sIdx, eIdx = eIdx, sIdx
@@ -280,11 +287,10 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		if lAnch {
 			sr, _ := findAnchorMatch(r, txt, lNeedle, lOcc)
 			if sr < 0 {
-				writeNodes(w, r, http.StatusOK, NodeResponse{
+				return nil, &NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("Start anchor %q (occurrence %d) not found in %s.", lNeedle, lOcc, fURNs[sIdx]),
-				})
-				return
+				}, http.StatusOK
 			}
 			rns := []rune(txt)
 			out, complete := sliceFromRunes(rns, sr)
@@ -330,11 +336,10 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		if rAnch {
 			erS, erE := findAnchorMatch(r, txt, rNeedle, rOcc)
 			if erS < 0 {
-				writeNodes(w, r, http.StatusOK, NodeResponse{
+				return nil, &NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("End anchor %q (occurrence %d) not found in %s.", rNeedle, rOcc, fURNs[eIdx]),
-				})
-				return
+				}, http.StatusOK
 			}
 			rns := []rune(txt)
 			out, complete := sliceUntilRunes(rns, erE)
@@ -359,9 +364,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeNodes(w, r, http.StatusOK, NodeResponse{
-		RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: nodes,
-	})
+	return nodes, nil, 0
 }
 
 func (s *Server) handleNavFirst(w http.ResponseWriter, r *http.Request) {

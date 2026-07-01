@@ -20,6 +20,7 @@ This project is a **modernisation** of the CITE Architecture’s microservices: 
     * `/texts/version`, `/cite`, `/healthz`
 * **Anchored URNs:** `urn:...:<ref>@needle[n]` (or `@/regex/`) and **ranges with anchors**.
 * **Unicode normalization** of responses via `?normalize=` (`nfc` default, `nfd`, `nfkc`, `nfkd`, `strip`) — see [Text encoding & normalization](#text-encoding--normalization).
+* **Content hashing:** `/texts/hash/{URN}` (per-node SHA-1/SHA-256 fingerprint of the resolved text), also available inline via `?hash=true` / `?meta=true`.
 * **No ellipses are inserted** into text; if content is clipped/truncated, responses include `complete: false`.
 * **CORS** via the `ORIGIN_ALLOWED` environment variable.
 
@@ -123,6 +124,45 @@ Returns parsed entries from `#!ctscatalog`.
     * Prefix returns all matching URNs.
     * Range `a-b` returns URNs from the first `a*` through the last `b*` (inclusive).
 
+### Content hash
+
+* `GET /texts/hash/{URN}`
+* `GET /{CEX}/texts/hash/{URN}`
+
+Returns a **per-node content hash** of the resolved passage — a lightweight,
+content-derived fingerprint for cache invalidation, deduplication, annotation
+anchoring, and citation verification. Works with every `{URN}` form (exact,
+prefix, range, anchored) and honors the same text filters (`clip`, `context`,
+`maxChars`, …) as `/texts/{URN}`.
+
+* One hash per resolved node (an array), each computed independently.
+* **Recipe:** `hex( algorithm( UTF-8( normalize(text) ) ) )`, lowercase hex.
+* **Text form:** the **normalized** text (NFC by default) — so the same passage
+  hashes identically regardless of NFC/NFD encoding. Honors `?normalize=` (e.g.
+  `?normalize=strip` for a diacritic-insensitive fingerprint). Whitespace and
+  newlines are **not** trimmed.
+* **`algorithm`** (query): `sha1` (default) or `sha256`. Both are stable and
+  widely implemented across languages/platforms. An unsupported value → `400`.
+
+An external system can reproduce a hash by applying the same normalization
+(default NFC) to the text and hashing its UTF-8 bytes.
+
+```json
+{
+  "requestUrn": ["urn:cts:greekLit:tlg0016.tlg001.grc:1.1"],
+  "status": "Success",
+  "service": "/texts/hash",
+  "algorithm": "sha1",
+  "hashes": [
+    { "urn": "urn:cts:greekLit:tlg0016.tlg001.grc:1.1", "hash": "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3" }
+  ]
+}
+```
+
+The same fingerprint (and lightweight source metadata) can also be requested
+**inline** on `/texts/{URN}` via `?hash=true` and `?meta=true` — see the query
+parameters below.
+
 ### Navigation
 
 * `GET /texts/first/{URN}`
@@ -161,6 +201,8 @@ Returns parsed entries from `#!ctscatalog`.
 * `tail` (bool) — with anchored URNs, return from the match then to the end of the passage.
 * `ignoreAccents` (bool) — with anchored URNs, match the anchor needle **diacritic-insensitively** (e.g. `Περσαι` matches `Πέρσαι`). Matching stays case-insensitive; offsets are reported against the original, accented text. Applies to plain-string anchors (single and range), not to `@/regex/` anchors.
 * `normalize` — Unicode normalization form applied to the **returned text** (see [Text encoding & normalization](#text-encoding--normalization)). One of `nfc` (default), `nfd`, `nfkc`, `nfkd`, `strip`. An unsupported value returns `400`.
+* `hash` (bool) — when `true`, add a per-node `hash` field to each node (over the returned/normalized text). Algorithm via `algorithm` (`sha1` default, `sha256`). Same digest as [`/texts/hash/{URN}`](#content-hash).
+* `meta` (bool) — when `true`, add a `meta` object with source provenance derived from the catalog: `source`, `groupName`, `workTitle`, `versionLabel`.
 
 > The service never inserts ellipses. If content is clipped or truncated, `complete` is `false`.
 
@@ -285,6 +327,15 @@ curl "http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.grc:1.
 
 # Diacritic-free, ligature-expanded base text (for search/collation)
 curl "http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.grc:1.1?normalize=strip"
+
+# Content hash (per node, sha1 default)
+curl http://127.0.0.1:8080/million/texts/hash/urn:cts:greekLit:tlg0016.tlg001.grc:1.1
+
+# Content hash with sha256
+curl "http://127.0.0.1:8080/million/texts/hash/urn:cts:greekLit:tlg0016.tlg001.grc:1.1?algorithm=sha256"
+
+# Passage with inline hash + source metadata
+curl "http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.grc:1.1?hash=true&meta=true"
 ```
 
 ---
