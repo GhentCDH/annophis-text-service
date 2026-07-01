@@ -1,6 +1,6 @@
 [![CI](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml/badge.svg)](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml)
-[![Release](https://github.com/GhentCDH/annophis-text-service/actions/workflows/release.yml/badge.svg)](https://github.com/GhentCDH/annophis-text-service/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/GhentCDH/annophis-text-service?sort=semver)](https://github.com/GhentCDH/annophis-text-service/releases/latest)
+[![Release Build](https://github.com/GhentCDH/annophis-text-service/actions/workflows/release.yml/badge.svg)](https://github.com/GhentCDH/annophis-text-service/actions/workflows/release.yml)
+[![Version](https://img.shields.io/github/v/release/GhentCDH/annophis-text-service?sort=semver&label=version)](https://github.com/GhentCDH/annophis-text-service/releases/latest)
 [![Go Reference](https://pkg.go.dev/badge/github.com/GhentCDH/annophis-text-service.svg)](https://pkg.go.dev/github.com/GhentCDH/annophis-text-service)
 
 # annophis-text-service
