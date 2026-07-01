@@ -1,5 +1,5 @@
 [![CI](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml/badge.svg)](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/GhentCDH/annophis-text-service)](https://goreportcard.com/report/github.com/GhentCDH/annophis-text-service)
+[![Go Reference](https://pkg.go.dev/badge/github.com/GhentCDH/annophis-text-service.svg)](https://pkg.go.dev/github.com/GhentCDH/annophis-text-service)
 
 # annophis-text-service
 
