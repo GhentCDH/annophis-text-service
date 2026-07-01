@@ -70,17 +70,23 @@ func stripToBase(s string) string {
 	return out
 }
 
-// writeNodes writes a node response, applying the request's ?normalize= mode to
-// each node's text. The stored text is already NFC, so nfc is a no-op.
-// Exception responses (no nodes) pass through unchanged.
-func writeNodes(w http.ResponseWriter, r *http.Request, status int, resp NodeResponse) {
-	mode, _ := normalizeMode(r) // validated by the handler; defaults to nfc
-	if mode != "nfc" {
-		for i := range resp.Nodes {
-			for j := range resp.Nodes[i].Text {
-				resp.Nodes[i].Text[j] = normalizeText(mode, resp.Nodes[i].Text[j])
-			}
+// applyNormalization rewrites each node's text with the given mode, in place.
+// The stored text is already NFC, so nfc is a no-op.
+func applyNormalization(mode string, nodes []Node) {
+	if mode == "nfc" {
+		return
+	}
+	for i := range nodes {
+		for j := range nodes[i].Text {
+			nodes[i].Text[j] = normalizeText(mode, nodes[i].Text[j])
 		}
 	}
+}
+
+// writeNodes writes a node response, applying the request's ?normalize= mode to
+// each node's text. Exception responses (no nodes) pass through unchanged.
+func writeNodes(w http.ResponseWriter, r *http.Request, status int, resp NodeResponse) {
+	mode, _ := normalizeMode(r) // validated by the handler; defaults to nfc
+	applyNormalization(mode, resp.Nodes)
 	writeJSON(w, status, resp)
 }
