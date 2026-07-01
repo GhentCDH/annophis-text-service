@@ -38,7 +38,7 @@ func LoadConfiguration(file string) (ServerConfig, error) {
 	if err != nil {
 		return ServerConfig{}, fmt.Errorf("open config: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var cfg ServerConfig
 	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
 		return ServerConfig{}, fmt.Errorf("decode config: %w", err)
@@ -101,7 +101,7 @@ func (s *Server) checkSourceReachable(ctx context.Context, u string) error {
 		req.Header.Set("User-Agent", ua)
 		resp, err := s.httpClient.Do(req)
 		if err == nil {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusOK {
 				return nil
 			}
@@ -117,7 +117,7 @@ func (s *Server) checkSourceReachable(ctx context.Context, u string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
 		return nil
 	}
@@ -137,7 +137,7 @@ func (s *Server) getContent(ctx context.Context, u string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GET %s: %w", u, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status %d", resp.StatusCode)
 	}

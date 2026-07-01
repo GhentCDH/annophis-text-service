@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-
-	cite "github.com/ThomasK81/gocite"
 )
 
 // workStem returns the 4-part CTS work stem with trailing colon,
@@ -83,22 +81,6 @@ func dedupPreserveOrder(xs []string) []string {
 	return out
 }
 
-func idsFromWork(w cite.Work) []string {
-	out := make([]string, len(w.Passages))
-	for i := range w.Passages {
-		out[i] = w.Passages[i].PassageID
-	}
-	return out
-}
-
-func textForID(id string, urns, texts []string) string {
-	i := indexOf(urns, id)
-	if i >= 0 {
-		return texts[i]
-	}
-	return ""
-}
-
 func indexOf(xs []string, want string) int {
 	for i, x := range xs {
 		if x == want {
@@ -106,23 +88,6 @@ func indexOf(xs []string, want string) int {
 		}
 	}
 	return -1
-}
-
-func buildWorkForStem(allURNs []string, stem string) cite.Work {
-	var w cite.Work
-	w.WorkID = stem
-	seq := 0
-	for i := range allURNs {
-		if strings.HasPrefix(allURNs[i], stem) {
-			seq++
-			w.Passages = append(w.Passages, cite.Passage{
-				PassageID: allURNs[i],
-				Index:     seq,
-			})
-		}
-	}
-	w, _ = cite.SortPassages(w)
-	return w
 }
 
 func attachNeighbors(n *Node, ids []string, idx int) {

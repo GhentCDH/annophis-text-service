@@ -260,7 +260,6 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	if eIdx >= 0 && sIdx > eIdx {
 		sIdx, eIdx = eIdx, sIdx
 		lAnch, rAnch = rAnch, lAnch
-		lRef, rRef = rRef, lRef
 		lNeedle, rNeedle = rNeedle, lNeedle
 		lOcc, rOcc = rOcc, lOcc
 	}
@@ -403,7 +402,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 		return
 	}
 
-	var idx int = -1
+	var idx = -1
 
 	switch nav {
 	case "first":
