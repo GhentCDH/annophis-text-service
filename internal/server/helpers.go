@@ -7,7 +7,20 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/go-chi/chi/v5"
 )
+
+// urnParam returns the {URN} path parameter, percent-decoded. Clients may encode
+// the URN (e.g. %3A for ':', %2F for '/' in regex anchors); chi does not decode
+// path params, so we do it here — once — at the handler boundary.
+func urnParam(r *http.Request) string {
+	raw := chi.URLParam(r, "URN")
+	if dec, err := url.PathUnescape(raw); err == nil {
+		return dec
+	}
+	return raw
+}
 
 // workStem returns the 4-part CTS work stem with trailing colon,
 // e.g. urn:cts:greekLit:tlg0007.tlg012.ziegler:
@@ -253,11 +266,7 @@ func anchorWindowFromRuneOffsets(r *http.Request, rns []rune, startRune, endRune
 
 // "urn:...:<ref>@needle[n]" → (base, needle, occ, ok)
 func parseAnchoredURN(u string) (string, string, int, bool) {
-	// Ensure we work on a decoded string, even if the client passes %CE%... manually
-	if dec, err := url.PathUnescape(u); err == nil {
-		u = dec
-	}
-
+	// u is already percent-decoded by urnParam at the handler boundary.
 	at := strings.LastIndex(u, "@")
 	if at < 0 {
 		return "", "", 0, false
@@ -400,10 +409,6 @@ func parseRefAnchorToken(tok string) (ref, needle string, occ int, anchored bool
 	tok = strings.TrimSpace(tok)
 	if tok == "" {
 		return "", "", 1, false
-	}
-
-	if dec, err := url.PathUnescape(tok); err == nil {
-		tok = dec
 	}
 
 	at := strings.Index(tok, "@")

@@ -82,7 +82,7 @@ func (s *Server) handleURNs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cexName := chi.URLParam(r, "CEX")
 	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
-	reqURN := chi.URLParam(r, "URN")
+	reqURN := urnParam(r)
 	svc := "/texts/urns"
 
 	if !cite.IsCTSURN(reqURN) && !cite.IsRange(reqURN) {

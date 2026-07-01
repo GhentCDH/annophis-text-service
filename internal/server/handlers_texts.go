@@ -14,7 +14,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cexName := chi.URLParam(r, "CEX")
 	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
-	reqURN := chi.URLParam(r, "URN")
+	reqURN := urnParam(r)
 	svc := "/texts"
 
 	if _, ok := normalizeMode(r); !ok {
@@ -387,7 +387,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	ctx := r.Context()
 	cexName := chi.URLParam(r, "CEX")
 	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
-	reqURN := chi.URLParam(r, "URN")
+	reqURN := urnParam(r)
 	svc := "/texts"
 
 	if _, ok := normalizeMode(r); !ok {
