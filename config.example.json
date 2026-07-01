@@ -1,0 +1,6 @@
+{
+  "host": "0.0.0.0",
+  "port": ":8080",
+  "cex_source": "https://cdn.jsdelivr.net/gh/ThomasK81/CTSTextservice@master/cex/",
+  "test_cex_source": "https://cdn.jsdelivr.net/gh/ThomasK81/CTSTextservice@master/cex/million.cex"
+}

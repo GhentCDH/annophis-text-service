@@ -58,7 +58,11 @@ The image exposes port `8080` and includes a `/healthz` healthcheck.
 
 ## Configuration
 
-Create `config.json`:
+Copy the tracked example and adjust it (`config.json` itself is gitignored):
+
+```bash
+cp config.example.json config.json
+```
 
 ```json
 {
@@ -68,6 +72,8 @@ Create `config.json`:
   "test_cex_source": "https://cdn.jsdelivr.net/gh/ThomasK81/CTSTextservice@master/cex/million.cex"
 }
 ```
+
+The Docker image bakes in `config.example.json` as its default `/app/config.json`; override it with a bind mount or the `CONFIG` env var.
 
 * If `cex_source` **ends with `.cex`**, it is treated as a single file.
 * If it is a **directory base**, you can select a file by:

@@ -23,7 +23,7 @@ WORKDIR /app
 COPY --from=build /out/annophis-text-service /app/annophis-text-service
 
 # Default config (can be overridden with a bind mount or ENV CONFIG)
-COPY config.json /app/config.json
+COPY config.example.json /app/config.json
 
 # Run as non-root
 RUN adduser -D -u 10001 appuser
