@@ -169,6 +169,10 @@ func BuildRouter(s *Server) http.Handler {
 	r.Get("/cite", s.handleCiteVersion)
 	r.Get("/texts/version", s.handleTextsVersion)
 
+	// Interactive API docs
+	r.Get("/docs", s.handleDocs)
+	r.Get("/openapi.yaml", s.handleOpenAPISpec)
+
 	// Base (no explicit CEX) — uses pickSource fallback logic
 	r.Get("/texts", s.handleWorkURNs)
 	r.Get("/texts/catalog", s.handleCatalog)

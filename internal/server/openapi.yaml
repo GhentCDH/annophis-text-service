@@ -1,0 +1,322 @@
+openapi: 3.0.3
+info:
+  title: annophis-text-service
+  version: 1.1.0
+  description: |
+    HTTP service for exposing CTS/CEX texts with a modern API.
+
+    All endpoints below are shown on the base routes. When `cex_source` is a
+    directory base, the same paths are also available under a `/{CEX}` prefix
+    (e.g. `GET /million/texts/{URN}`) to select a specific `.cex` file.
+
+    **URN path parameter:** CTS URNs contain `:` (and `@` for anchors). Enter
+    them literally in *Try it out* — the client percent-encodes them and the
+    server decodes them. For regex anchors, encode the `/` delimiters as `%2F`.
+servers:
+  - url: /
+    description: This server
+
+paths:
+  /cite:
+    get:
+      summary: Service family and version
+      operationId: getCite
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CITEResponse" }
+
+  /texts/version:
+    get:
+      summary: Texts API version
+      operationId: getTextsVersion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionResponse" }
+
+  /healthz:
+    get:
+      summary: Health probe (checks CEX source reachability)
+      operationId: getHealthz
+      responses:
+        "200": { description: Healthy }
+        "503": { description: Unhealthy }
+
+  /texts:
+    get:
+      summary: List work stems
+      operationId: listWorks
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/URNResponse" }
+
+  /texts/catalog:
+    get:
+      summary: Parsed catalog entries (incl. synthetic entries for plain-text works)
+      operationId: getCatalog
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CatalogResponse" }
+
+  /texts/urns/{URN}:
+    get:
+      summary: Expand a URN or range to concrete URNs
+      operationId: expandURNs
+      parameters:
+        - $ref: "#/components/parameters/URN"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/URNResponse" }
+
+  /texts/first/{URN}:
+    get:
+      summary: First passage in the work
+      operationId: navFirst
+      parameters:
+        - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/normalize"
+      responses:
+        "200": { $ref: "#/components/responses/Nodes" }
+
+  /texts/last/{URN}:
+    get:
+      summary: Last passage in the work
+      operationId: navLast
+      parameters:
+        - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/normalize"
+      responses:
+        "200": { $ref: "#/components/responses/Nodes" }
+
+  /texts/previous/{URN}:
+    get:
+      summary: Previous passage in the work
+      operationId: navPrevious
+      parameters:
+        - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/normalize"
+      responses:
+        "200": { $ref: "#/components/responses/Nodes" }
+
+  /texts/next/{URN}:
+    get:
+      summary: Next passage in the work
+      operationId: navNext
+      parameters:
+        - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/normalize"
+      responses:
+        "200": { $ref: "#/components/responses/Nodes" }
+
+  /texts/hash/{URN}:
+    get:
+      summary: Per-node content hash of the resolved text
+      operationId: hashPassage
+      parameters:
+        - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/algorithm"
+        - $ref: "#/components/parameters/normalize"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HashResponse" }
+        "400":
+          description: Unsupported parameter value
+
+  /texts/{URN}:
+    get:
+      summary: Resolve a passage (exact, prefix, range, or anchored)
+      operationId: getPassage
+      parameters:
+        - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/normalize"
+        - $ref: "#/components/parameters/clip"
+        - $ref: "#/components/parameters/context"
+        - $ref: "#/components/parameters/maxChars"
+        - $ref: "#/components/parameters/tail"
+        - $ref: "#/components/parameters/substring"
+        - $ref: "#/components/parameters/ignoreAccents"
+        - $ref: "#/components/parameters/hash"
+        - $ref: "#/components/parameters/algorithm"
+        - $ref: "#/components/parameters/meta"
+      responses:
+        "200": { $ref: "#/components/responses/Nodes" }
+        "400":
+          description: Invalid URN or unsupported parameter value
+
+components:
+  parameters:
+    URN:
+      name: URN
+      in: path
+      required: true
+      description: CTS URN (exact, prefix, `a-b` range, or `...@needle[n]` anchor).
+      schema: { type: string }
+      example: "urn:cts:greekLit:tlg0016.tlg001.grc:1.1"
+    normalize:
+      name: normalize
+      in: query
+      description: Unicode normalization applied to returned text.
+      schema:
+        type: string
+        enum: [nfc, nfd, nfkc, nfkd, strip]
+        default: nfc
+    algorithm:
+      name: algorithm
+      in: query
+      description: Hash algorithm.
+      schema:
+        type: string
+        enum: [sha1, sha256]
+        default: sha1
+    clip:
+      name: clip
+      in: query
+      description: Return a snippet (default true for anchored URNs) or the full passage.
+      schema: { type: boolean }
+    context:
+      name: context
+      in: query
+      description: Runes of context around an anchor match.
+      schema: { type: integer }
+    maxChars:
+      name: maxChars
+      in: query
+      description: Hard cap on text length (no ellipsis; sets complete=false when truncated).
+      schema: { type: integer }
+    tail:
+      name: tail
+      in: query
+      description: With anchored URNs, return from the match to the end of the passage.
+      schema: { type: boolean }
+    substring:
+      name: substring
+      in: query
+      description: With clip=true, return a window around the first match.
+      schema: { type: string }
+    ignoreAccents:
+      name: ignoreAccents
+      in: query
+      description: Match anchor needles diacritic-insensitively (plain-string anchors only).
+      schema: { type: boolean }
+    hash:
+      name: hash
+      in: query
+      description: Add a per-node `hash` field to each node.
+      schema: { type: boolean }
+    meta:
+      name: meta
+      in: query
+      description: Add a `meta` object with source provenance.
+      schema: { type: boolean }
+
+  responses:
+    Nodes:
+      description: OK
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/NodeResponse" }
+
+  schemas:
+    Node:
+      type: object
+      properties:
+        urn: { type: array, items: { type: string } }
+        text: { type: array, items: { type: string } }
+        previous: { type: array, items: { type: string } }
+        next: { type: array, items: { type: string } }
+        sequence: { type: integer }
+        complete: { type: boolean }
+        hash: { type: string, description: "present when ?hash=true" }
+    SourceMeta:
+      type: object
+      properties:
+        source: { type: string }
+        groupName: { type: string }
+        workTitle: { type: string }
+        versionLabel: { type: string }
+    NodeResponse:
+      type: object
+      properties:
+        requestUrn: { type: array, items: { type: string } }
+        status: { type: string, example: Success }
+        service: { type: string }
+        message: { type: string }
+        urns: { type: array, items: { type: string } }
+        nodes: { type: array, items: { $ref: "#/components/schemas/Node" } }
+        meta: { $ref: "#/components/schemas/SourceMeta" }
+    NodeHash:
+      type: object
+      properties:
+        urn: { type: string }
+        hash: { type: string }
+    HashResponse:
+      type: object
+      properties:
+        requestUrn: { type: array, items: { type: string } }
+        status: { type: string }
+        service: { type: string }
+        message: { type: string }
+        algorithm: { type: string, example: sha1 }
+        hashes:
+          type: array
+          items: { $ref: "#/components/schemas/NodeHash" }
+    URNResponse:
+      type: object
+      properties:
+        requestUrn: { type: array, items: { type: string } }
+        status: { type: string }
+        service: { type: string }
+        message: { type: string }
+        urns: { type: array, items: { type: string } }
+    CatalogEntry:
+      type: object
+      properties:
+        urn: { type: string }
+        citationScheme: { type: string }
+        groupName: { type: string }
+        workTitle: { type: string }
+        versionLabel: { type: string }
+        exemplarLabel: { type: string }
+        online: { type: boolean }
+    CatalogResponse:
+      type: object
+      properties:
+        status: { type: string }
+        service: { type: string }
+        message: { type: string }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/CatalogEntry" }
+    Versions:
+      type: object
+      properties:
+        texts: { type: string }
+    CITEResponse:
+      type: object
+      properties:
+        status: { type: string }
+        service: { type: string }
+        versions: { $ref: "#/components/schemas/Versions" }
+    VersionResponse:
+      type: object
+      properties:
+        status: { type: string }
+        service: { type: string }
+        version: { type: string }

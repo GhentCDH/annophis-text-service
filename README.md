@@ -22,6 +22,7 @@ This project is a **modernisation** of the CITE Architecture’s microservices: 
 * **Unicode normalization** of responses via `?normalize=` (`nfc` default, `nfd`, `nfkc`, `nfkd`, `strip`) — see [Text encoding & normalization](#text-encoding--normalization).
 * **Content hashing:** `/texts/hash/{URN}` (per-node SHA-1/SHA-256 fingerprint of the resolved text), also available inline via `?hash=true` / `?meta=true`.
 * **Plain-text ingestion:** point `txt_data` at a directory of `.txt` files to serve them as line-based works through the full API — see [Plain-text ingestion](#plain-text-ingestion).
+* **Interactive API docs** at `/docs` (Swagger UI, live *Try it out*) with an OpenAPI spec at `/openapi.yaml`.
 * **No ellipses are inserted** into text; if content is clipped/truncated, responses include `complete: false`.
 * **CORS** via the `ORIGIN_ALLOWED` environment variable.
 
@@ -148,6 +149,9 @@ curl http://127.0.0.1:8080/texts/hash/urn:cts:evwrit:p_oxy_1234.txtparsed:3
 ---
 
 ## API
+
+> **Interactive docs:** open **`/docs`** in a browser for a Swagger UI with live
+> *Try it out* against the running server. The raw spec is at **`/openapi.yaml`**.
 
 ### Version and health
 
