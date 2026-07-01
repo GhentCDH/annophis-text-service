@@ -1,0 +1,8 @@
+run:
+  timeout: 5m
+
+# Uses golangci-lint's default linter set (errcheck, gosimple, govet,
+# ineffassign, staticcheck, unused) with its default exclusions.
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
