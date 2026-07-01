@@ -6,6 +6,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // A tiny CEX fixture: one Greek work with three passages (1.1 repeats "Πέρσαι"
@@ -222,6 +225,40 @@ func TestParse_SkipsMalformedRow(t *testing.T) {
 			}
 			return ""
 		}())
+	}
+}
+
+func TestNormalizeParam(t *testing.T) {
+	h := newTestRouter(t)
+	urn := "urn:cts:greekLit:tlg0016.tlg001.grc:1.1" // "Πέρσαι μὲν καὶ Πέρσαι πάλιν"
+
+	// Default (no param) equals explicit nfc.
+	def := getNodes(t, h, "/texts/"+urn)
+	nfc := getNodes(t, h, "/texts/"+urn+"?normalize=nfc")
+	if def.Status != "Success" || def.Nodes[0].Text[0] != nfc.Nodes[0].Text[0] {
+		t.Fatalf("default should equal nfc")
+	}
+
+	// nfd is the decomposition of nfc and differs from it.
+	nfd := getNodes(t, h, "/texts/"+urn+"?normalize=nfd")
+	if nfd.Nodes[0].Text[0] != norm.NFD.String(nfc.Nodes[0].Text[0]) {
+		t.Fatalf("nfd is not the decomposition of nfc")
+	}
+	if nfd.Nodes[0].Text[0] == nfc.Nodes[0].Text[0] {
+		t.Fatalf("expected nfd to differ from nfc for accented Greek")
+	}
+
+	// strip removes all combining marks.
+	strip := getNodes(t, h, "/texts/"+urn+"?normalize=strip")
+	for _, r := range strip.Nodes[0].Text[0] {
+		if unicode.Is(unicode.Mn, r) {
+			t.Fatalf("combining mark in strip output: %q", strip.Nodes[0].Text[0])
+		}
+	}
+
+	// Unknown value is rejected.
+	if bad := getNodes(t, h, "/texts/"+urn+"?normalize=bogus"); bad.Status != "Exception" {
+		t.Fatalf("expected Exception for unsupported normalize value, got %s", bad.Status)
 	}
 }
 
