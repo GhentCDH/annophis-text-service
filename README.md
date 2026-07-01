@@ -1,3 +1,4 @@
+[![CI](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml/badge.svg)](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/GhentCDH/annophis-text-service)](https://goreportcard.com/report/github.com/GhentCDH/annophis-text-service)
 
 # annophis-text-service
@@ -133,6 +134,7 @@ Returns parsed entries from `#!ctscatalog`.
 * **Prefix:** `urn:cts:greekLit:tlg0016.tlg001.eng:1`
 * **Range:** `...:1.1-1.2`
 * **Anchored:** `...:1.1@Persians[1]` or `...:1.1@/Per(s|z)ians/[1]`
+  (regex delimiters `/` must be percent-encoded as `%2F` in the URL path)
 * **Anchored range:**
 
     * Across nodes: `...:1.0@forth[1]-1.1`
@@ -148,6 +150,7 @@ Returns parsed entries from `#!ctscatalog`.
 * `context` (int) — number of runes around the match (default `0` for anchored URNs).
 * `maxChars` (int) — hard cap on text length (no ellipsis; sets `complete=false` when truncated).
 * `tail` (bool) — with anchored URNs, return from the match then to the end of the passage.
+* `ignoreAccents` (bool) — with anchored URNs, match the anchor needle **diacritic-insensitively** (e.g. `Περσαι` matches `Πέρσαι`). Matching stays case-insensitive; offsets are reported against the original, accented text. Applies to plain-string anchors (single and range), not to `@/regex/` anchors.
 
 > The service never inserts ellipses. If content is clipped or truncated, `complete` is `false`.
 
@@ -201,6 +204,9 @@ curl http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.eng:1.1
 # Anchored substring (first occurrence of "Persians")
 curl http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.eng:1.1@Persians[1]
 
+# Accent-insensitive anchor (unaccented needle matches accented Greek)
+curl "http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.grc:1.1@Περσαι[1]?ignoreAccents=true"
+
 # Anchored range across nodes
 curl http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.eng:1.0@forth[1]-1.1
 
@@ -242,6 +248,6 @@ See `LICENSE` in the repository.
 
 ## Credits
 
-Development by [Ghent Centre for Digital Humanities - Ghent University](https://www.ghentcdh.ugent.be/). Funded by the [GhentCDH research projects](https://www.ghentcdh.ugent.be/projects).
+Development by [Ghent Centre for Digital Humanities - Ghent University](https://www.ghentcdh.ugent.be/) and by [YouSayData](https://www.yousaydata.com/). Funded by the [GhentCDH research projects](https://www.ghentcdh.ugent.be/projects).
 
 <img src="https://www.ghentcdh.ugent.be/ghentcdh_logo_blue_text_transparent_bg_landscape.svg" alt="Landscape" width="500">

@@ -73,7 +73,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			end := matches[occ-1][1]
 			textOut, complete = anchorWindowFromByteOffsets(r, full, start, end)
 		} else {
-			startRune, endRune := findNthInsensitive(full, needle, occ)
+			startRune, endRune := findAnchorMatch(r, full, needle, occ)
 			if startRune < 0 {
 				writeJSON(w, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
@@ -208,7 +208,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	// both anchors in same passage
 	if lAnch && rAnch && rRef == lRef && sIdx >= 0 {
 		full := fTexts[sIdx]
-		startRune, endRuneStart := findNthInsensitive(full, lNeedle, lOcc)
+		startRune, endRuneStart := findAnchorMatch(r, full, lNeedle, lOcc)
 		if startRune < 0 {
 			writeJSON(w, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
@@ -216,7 +216,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		erS, erE := findNthInsensitive(full, rNeedle, rOcc)
+		erS, erE := findAnchorMatch(r, full, rNeedle, rOcc)
 		if erS < 0 || erS < endRuneStart {
 			writeJSON(w, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
@@ -271,7 +271,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	{
 		txt := fTexts[sIdx]
 		if lAnch {
-			sr, _ := findNthInsensitive(txt, lNeedle, lOcc)
+			sr, _ := findAnchorMatch(r, txt, lNeedle, lOcc)
 			if sr < 0 {
 				writeJSON(w, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
@@ -321,7 +321,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	if eIdx >= 0 && eIdx >= sIdx {
 		txt := fTexts[eIdx]
 		if rAnch {
-			erS, erE := findNthInsensitive(txt, rNeedle, rOcc)
+			erS, erE := findAnchorMatch(r, txt, rNeedle, rOcc)
 			if erS < 0 {
 				writeJSON(w, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,

@@ -33,27 +33,17 @@ func (s *Server) parseCTSData(ctx context.Context, source string) (urns, texts [
 		line, err := r.Read()
 		if err != nil {
 			if errors.Is(err, csv.ErrFieldCount) {
-				// keep going
+				// Wrong number of fields on this row: skip it, keep reading.
+				continue
 			}
-			if err.Error() == "EOF" || errors.Is(err, context.Canceled) {
-				break
-			}
-			if err != nil && err.Error() == "EOF" {
-				break
-			}
-			if err != nil {
-				break
-			}
+			// io.EOF or any other error ends parsing.
+			break
 		}
 		if len(line) != 2 {
-			if len(line) == 0 {
-				break
-			}
 			continue
 		}
-		text := norm.NFC.String(line[1])
 		urns = append(urns, strings.TrimSpace(line[0]))
-		texts = append(texts, text)
+		texts = append(texts, norm.NFC.String(line[1]))
 	}
 	return urns, texts, nil
 }
