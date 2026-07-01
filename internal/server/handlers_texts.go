@@ -17,6 +17,14 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	reqURN := chi.URLParam(r, "URN")
 	svc := "/texts"
 
+	if _, ok := normalizeMode(r); !ok {
+		writeJSON(w, http.StatusBadRequest, NodeResponse{
+			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
+			Message: "Unsupported normalize value. Use one of: nfc, nfd, nfkc, nfkd, strip.",
+		})
+		return
+	}
+
 	// Load data
 	allURNs, allTexts, err := s.parseCTSData(ctx, source)
 	if err != nil {
@@ -43,7 +51,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 		idx := indexOf(allURNs, baseURN)
 		if idx < 0 {
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not find base passage " + baseURN,
 			})
 			return
@@ -63,7 +71,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			}
 			matches := re.FindAllStringIndex(full, -1)
 			if occ < 1 || occ > len(matches) {
-				writeJSON(w, http.StatusOK, NodeResponse{
+				writeNodes(w, r, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("Regex %q (occurrence %d) not found in %s.", pat, occ, baseURN),
 				})
@@ -75,7 +83,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		} else {
 			startRune, endRune := findAnchorMatch(r, full, needle, occ)
 			if startRune < 0 {
-				writeJSON(w, http.StatusOK, NodeResponse{
+				writeNodes(w, r, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("Substring %q (occurrence %d) not found in %s.", needle, occ, baseURN),
 				})
@@ -93,7 +101,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 		attachNeighbors(&node, allURNs, idx)
 
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: []Node{node},
 		})
 		return
@@ -118,7 +126,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			Complete: complete,
 		}
 		attachNeighbors(&node, allURNs, idx)
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: []Node{node},
 		})
 		return
@@ -141,12 +149,12 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(nodes) == 0 {
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not find node to " + reqURN + " in source.",
 			})
 			return
 		}
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: nodes,
 		})
 		return
@@ -155,7 +163,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	// --- Range (supports anchors on both sides)
 	parts := strings.Split(reqURN, ":")
 	if len(parts) < 5 {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not parse " + reqURN,
 		})
 		return
@@ -164,7 +172,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 	rangeRef := parts[4]
 	dash := strings.Index(rangeRef, "-")
 	if dash <= 0 || dash >= len(rangeRef)-1 {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not parse range " + reqURN,
 		})
 		return
@@ -187,7 +195,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(fURNs) == 0 {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Could not find node to " + reqURN + " in source.",
 		})
 		return
@@ -210,7 +218,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		full := fTexts[sIdx]
 		startRune, endRuneStart := findAnchorMatch(r, full, lNeedle, lOcc)
 		if startRune < 0 {
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 				Message: fmt.Sprintf("Start anchor %q (occurrence %d) not found in %s.", lNeedle, lOcc, stem+lRef),
 			})
@@ -218,7 +226,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 		erS, erE := findAnchorMatch(r, full, rNeedle, rOcc)
 		if erS < 0 || erS < endRuneStart {
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 				Message: fmt.Sprintf("End anchor %q (occurrence %d) not found after start in %s.", rNeedle, rOcc, stem+lRef),
 			})
@@ -233,26 +241,26 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 			Complete: complete,
 		}
 		attachNeighbors(&node, fURNs, sIdx)
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: []Node{node},
 		})
 		return
 	}
 
 	if sIdx < 0 {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Start of range not found.",
 		})
 		return
 	}
 	if rRef != "" && eIdx < 0 {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "End of range not found.",
 		})
 		return
 	}
 	if !rAnch && rRef == "" {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "Right side of range missing.",
 		})
 		return
@@ -272,7 +280,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		if lAnch {
 			sr, _ := findAnchorMatch(r, txt, lNeedle, lOcc)
 			if sr < 0 {
-				writeJSON(w, http.StatusOK, NodeResponse{
+				writeNodes(w, r, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("Start anchor %q (occurrence %d) not found in %s.", lNeedle, lOcc, fURNs[sIdx]),
 				})
@@ -322,7 +330,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		if rAnch {
 			erS, erE := findAnchorMatch(r, txt, rNeedle, rOcc)
 			if erS < 0 {
-				writeJSON(w, http.StatusOK, NodeResponse{
+				writeNodes(w, r, http.StatusOK, NodeResponse{
 					RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
 					Message: fmt.Sprintf("End anchor %q (occurrence %d) not found in %s.", rNeedle, rOcc, fURNs[eIdx]),
 				})
@@ -351,7 +359,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, NodeResponse{
+	writeNodes(w, r, http.StatusOK, NodeResponse{
 		RequestUrn: []string{reqURN}, Status: "Success", Service: svc, Nodes: nodes,
 	})
 }
@@ -378,6 +386,14 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
 	reqURN := chi.URLParam(r, "URN")
 	svc := "/texts"
+
+	if _, ok := normalizeMode(r); !ok {
+		writeJSON(w, http.StatusBadRequest, NodeResponse{
+			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc,
+			Message: "Unsupported normalize value. Use one of: nfc, nfd, nfkc, nfkd, strip.",
+		})
+		return
+	}
 
 	// validate URN
 	if !cite.IsCTSURN(reqURN) {
@@ -424,7 +440,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	case "previous":
 		cur := indexOf(allURNs, reqURN)
 		if cur < 0 {
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN},
 				Status:     "Exception",
 				Service:    svc,
@@ -434,7 +450,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 		}
 		if cur == 0 || !sameWork(allURNs[cur-1], reqURN) {
 			// no previous in same work
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN},
 				Status:     "Exception",
 				Service:    svc,
@@ -447,7 +463,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	case "next":
 		cur := indexOf(allURNs, reqURN)
 		if cur < 0 {
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN},
 				Status:     "Exception",
 				Service:    svc,
@@ -457,7 +473,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 		}
 		if cur+1 >= len(allURNs) || !sameWork(allURNs[cur+1], reqURN) {
 			// no next in same work
-			writeJSON(w, http.StatusOK, NodeResponse{
+			writeNodes(w, r, http.StatusOK, NodeResponse{
 				RequestUrn: []string{reqURN},
 				Status:     "Exception",
 				Service:    svc,
@@ -469,7 +485,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	}
 
 	if idx < 0 || idx >= len(allURNs) {
-		writeJSON(w, http.StatusOK, NodeResponse{
+		writeNodes(w, r, http.StatusOK, NodeResponse{
 			RequestUrn: []string{reqURN},
 			Status:     "Exception",
 			Service:    svc,
@@ -489,7 +505,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	}
 	attachNeighbors(&node, allURNs, idx)
 
-	writeJSON(w, http.StatusOK, NodeResponse{
+	writeNodes(w, r, http.StatusOK, NodeResponse{
 		RequestUrn: []string{reqURN},
 		Status:     "Success",
 		Service:    svc,

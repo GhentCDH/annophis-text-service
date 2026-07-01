@@ -17,6 +17,7 @@ This project is a **modernisation** of the CITE Architecture’s microservices: 
     * `/texts/catalog` (parsed from `#!ctscatalog`)
     * `/texts/version`, `/cite`, `/healthz`
 * **Anchored URNs:** `urn:...:<ref>@needle[n]` (or `@/regex/`) and **ranges with anchors**.
+* **Unicode normalization** of responses via `?normalize=` (`nfc` default, `nfd`, `nfkc`, `nfkd`, `strip`) — see [Text encoding & normalization](#text-encoding--normalization).
 * **No ellipses are inserted** into text; if content is clipped/truncated, responses include `complete: false`.
 * **CORS** via the `ORIGIN_ALLOWED` environment variable.
 
@@ -157,8 +158,66 @@ Returns parsed entries from `#!ctscatalog`.
 * `maxChars` (int) — hard cap on text length (no ellipsis; sets `complete=false` when truncated).
 * `tail` (bool) — with anchored URNs, return from the match then to the end of the passage.
 * `ignoreAccents` (bool) — with anchored URNs, match the anchor needle **diacritic-insensitively** (e.g. `Περσαι` matches `Πέρσαι`). Matching stays case-insensitive; offsets are reported against the original, accented text. Applies to plain-string anchors (single and range), not to `@/regex/` anchors.
+* `normalize` — Unicode normalization form applied to the **returned text** (see [Text encoding & normalization](#text-encoding--normalization)). One of `nfc` (default), `nfd`, `nfkc`, `nfkd`, `strip`. An unsupported value returns `400`.
 
 > The service never inserts ellipses. If content is clipped or truncated, `complete` is `false`.
+
+---
+
+## Text encoding & normalization
+
+Working with Greek (and Latin, Arabic, and other scripts that lean on combining
+characters, precomposed forms, and ligatures) means the *same-looking* text can
+be encoded in different ways. This service takes an explicit position on that.
+
+### Why NFC is the stored/default form
+
+On load, every passage is normalised to **NFC** (Normalization Form C,
+*composed*) and served as NFC by default. NFC:
+
+* is the **interchange standard** (recommended by the W3C) and what most clients,
+  editors, and fonts expect;
+* gives a **single, deterministic encoding** for canonically-equivalent text, so
+  it is a stable baseline for the service's **anchor matching** (an anchor needle
+  is NFC-normalised before it is searched, so it lines up with the stored text).
+
+All matching, clipping, and offset logic runs on this NFC baseline. The
+`normalize` parameter is a **response-time transform only** — it never mutates
+the stored CEX data and never changes how anchors are resolved.
+
+### `normalize` options
+
+| Value    | Meaning | Typical use |
+|----------|---------|-------------|
+| `nfc`    | *(default)* Composed: precomposed code points where they exist (`ά` = U+03AC). | Display, interchange. |
+| `nfd`    | Decomposed: base letter + combining marks (`ά` = `α` + `◌́`). Uniformly `base + marks`. | Collation, alignment, per-mark processing. |
+| `nfkc`   | Composed **compatibility** form: also folds compatibility variants (ligature `ﬁ`→`fi`, micro sign `µ`→Greek `μ`, ohm `Ω`→`Ω`). Lossy. | Normalising typographic variants while keeping accents. |
+| `nfkd`   | Decomposed compatibility form. Lossy. | As above, decomposed. |
+| `strip`  | `nfkd` + **drop combining marks** + **expand letter ligatures** (`œ`→`oe`, `æ`→`ae`, `ß`→`ss`) → a diacritic-free base-character sequence. | Full-text search, HTR/NLP pre-processing, matching `Herodotus` against `Hēródotus`. |
+
+> **NFC vs NFD, briefly.** Both are lossless and reversible — the same
+> characters, encoded differently. NFC composes to single code points where it
+> can; NFD always splits into `base + marks`. NFD is not "more unique" than NFC —
+> both are canonical — but its uniform decomposition is what makes accent
+> stripping and collation easy, which is why `strip` is built on the K-forms.
+
+### Limitations: looks the same, genuinely different
+
+Normalization only unifies characters that Unicode considers **equivalent**. It
+will **not** merge look-alikes that are actually different characters — and no
+`normalize` value (not even `strip`) fixes these:
+
+* **Cross-script homoglyphs.** Greek `Α` (U+0391), Latin `A` (U+0041), and
+  Cyrillic `А` (U+0410) render identically but are three distinct letters.
+  Likewise Greek `Ο/ο/Ρ` vs Latin `O/o/P`. Detecting these needs a *confusables*
+  table (Unicode [UTS #39](https://www.unicode.org/reports/tr39/)), which is out
+  of scope here.
+* **Compatibility variants** (micro sign vs mu, ohm sign vs omega, ligatures) are
+  only folded by the **K-forms** (`nfkc`/`nfkd`/`strip`), and that folding is
+  lossy — do not use it when the exact code point matters.
+* **No precomposed form.** Some polytonic Greek combinations (e.g. macron +
+  accent) have no single NFC code point, so even NFC text can legitimately
+  contain combining marks. Use `nfd`/`strip` if you need a uniform base sequence.
 
 ---
 
@@ -218,6 +277,12 @@ curl http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.eng:1.0
 
 # Anchored range within one node (start and end anchors)
 curl http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.eng:1.0@forth[1]-@Herodotus[1]
+
+# Decomposed (NFD) output
+curl "http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.grc:1.1?normalize=nfd"
+
+# Diacritic-free, ligature-expanded base text (for search/collation)
+curl "http://127.0.0.1:8080/million/texts/urn:cts:greekLit:tlg0016.tlg001.grc:1.1?normalize=strip"
 ```
 
 ---
