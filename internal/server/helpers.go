@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode"
 
 	cite "github.com/ThomasK81/gocite"
 )
@@ -328,6 +329,74 @@ func parseAnchoredURN(u string) (string, string, int, bool) {
 	return base, needle, occ, true
 }
 
+// findAnchorMatch resolves the n-th occurrence of needle in haystack, returning
+// rune start,end offsets in the ORIGINAL string. Matching is always
+// case-insensitive; when the request carries ?ignoreAccents=true it is also
+// diacritic-insensitive, so e.g. "Περσαι" matches "Πέρσαι".
+func findAnchorMatch(r *http.Request, haystack, needle string, n int) (int, int) {
+	if parseBool(r.URL.Query().Get("ignoreAccents")) {
+		return findNthFolded(haystack, needle, n)
+	}
+	return findNthInsensitive(haystack, needle, n)
+}
+
+// buildFolded returns a diacritic-stripped copy of rns (via NFD decomposition,
+// dropping combining marks) together with origIdx, mapping each folded rune back
+// to the index of the original rune it came from. This lets accent-insensitive
+// matches be reported as offsets into the original, un-stripped text.
+func buildFolded(rns []rune) (folded []rune, origIdx []int) {
+	for i, r := range rns {
+		for _, dr := range norm.NFD.String(string(r)) {
+			if unicode.Is(unicode.Mn, dr) { // nonspacing (combining) mark
+				continue
+			}
+			folded = append(folded, dr)
+			origIdx = append(origIdx, i)
+		}
+	}
+	return folded, origIdx
+}
+
+// stripDiacritics removes combining marks from s (NFD, drop Mn), preserving case.
+func stripDiacritics(s string) string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// findNthFolded is like findNthInsensitive but ignores diacritics on both sides.
+// Offsets are mapped back to the original (accented) rune positions.
+func findNthFolded(haystack, needle string, n int) (int, int) {
+	if n < 1 || needle == "" {
+		return -1, -1
+	}
+	hr := []rune(haystack)
+	folded, origIdx := buildFolded(hr)
+	nf := stripDiacritics(needle)
+
+	hl := len(folded)
+	nl := len([]rune(nf))
+	if nl == 0 || nl > hl {
+		return -1, -1
+	}
+
+	occ := 0
+	for i := 0; i <= hl-nl; i++ {
+		if strings.EqualFold(string(folded[i:i+nl]), nf) {
+			occ++
+			if occ == n {
+				return origIdx[i], origIdx[i+nl-1] + 1
+			}
+		}
+	}
+	return -1, -1
+}
+
 // n-th case-insensitive occurrence → rune start,end
 func findNthInsensitive(haystack, needle string, n int) (int, int) {
 	if n < 1 || needle == "" {
@@ -388,6 +457,12 @@ func parseRefAnchorToken(tok string) (ref, needle string, occ int, anchored bool
 	} else {
 		needle = rest
 	}
+
+	// Normalise ref and needle to NFC so range anchors match the NFC text we
+	// stored, mirroring parseAnchoredURN for single anchors.
+	ref = norm.NFC.String(ref)
+	needle = norm.NFC.String(needle)
+
 	return ref, needle, occ, anchored
 }
 
