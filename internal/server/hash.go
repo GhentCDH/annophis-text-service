@@ -46,7 +46,7 @@ func (s *Server) sourceMeta(ctx context.Context, source string, nodes []Node) *S
 	if len(nodes) == 0 || len(nodes[0].URN) == 0 {
 		return m
 	}
-	entries, err := s.parseCTSCatalog(ctx, source)
+	entries, err := s.loadCatalog(ctx, source)
 	if err != nil {
 		return m
 	}
@@ -88,7 +88,7 @@ func (s *Server) handleHash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allURNs, allTexts, err := s.parseCTSData(ctx, source)
+	allURNs, allTexts, err := s.loadCorpus(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, HashResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "No results for " + reqURN,

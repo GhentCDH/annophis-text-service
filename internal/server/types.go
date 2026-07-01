@@ -97,4 +97,5 @@ type ServerConfig struct {
 	Port       string `json:"port"`
 	Source     string `json:"cex_source"`      // file OR directory base
 	TestSource string `json:"test_cex_source"` // fallback for /texts without CEX
+	TxtData    string `json:"txt_data"`        // dir of plain-text works: <txt_data>/<namespace>/<file>.txt
 }

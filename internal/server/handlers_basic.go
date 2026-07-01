@@ -31,7 +31,7 @@ func (s *Server) handleCatalog(w http.ResponseWriter, r *http.Request) {
 	cexName := chi.URLParam(r, "CEX")
 	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
 
-	entries, err := s.parseCTSCatalog(ctx, source)
+	entries, err := s.loadCatalog(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, CatalogResponse{
 			Status:  "Exception",
@@ -52,7 +52,7 @@ func (s *Server) handleWorkURNs(w http.ResponseWriter, r *http.Request) {
 	cexName := chi.URLParam(r, "CEX")
 	source := pickSourceFromReq(s.cfg, cexName, r.URL.Query())
 
-	urns, _, err := s.parseCTSData(ctx, source)
+	urns, _, err := s.loadCorpus(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, URNResponse{
 			Status:  "Exception",
@@ -91,7 +91,7 @@ func (s *Server) handleURNs(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	allURNs, _, err := s.parseCTSData(ctx, source)
+	allURNs, _, err := s.loadCorpus(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, URNResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "No results for " + reqURN,

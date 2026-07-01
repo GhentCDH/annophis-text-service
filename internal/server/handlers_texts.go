@@ -32,7 +32,7 @@ func (s *Server) handlePassage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allURNs, allTexts, err := s.parseCTSData(ctx, source)
+	allURNs, allTexts, err := s.loadCorpus(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, NodeResponse{
 			RequestUrn: []string{reqURN}, Status: "Exception", Service: svc, Message: "No results for " + reqURN,
@@ -410,7 +410,7 @@ func (s *Server) handleNav(w http.ResponseWriter, r *http.Request, nav string) {
 	}
 
 	// Load data
-	allURNs, allTexts, err := s.parseCTSData(ctx, source)
+	allURNs, allTexts, err := s.loadCorpus(ctx, source)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, NodeResponse{
 			RequestUrn: []string{reqURN},
