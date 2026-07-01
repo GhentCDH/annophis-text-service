@@ -12,6 +12,10 @@ info:
     **URN path parameter:** CTS URNs contain `:` (and `@` for anchors). Enter
     them literally in *Try it out* — the client percent-encodes them and the
     server decodes them. For regex anchors, encode the `/` delimiters as `%2F`.
+
+    **Demo data:** when `cex_source` is a directory base, set the `cex` query
+    parameter to `million` to query the bundled sample corpus (Herodotus,
+    Plutarch, Cicero, the Qurʼan, and more).
 servers:
   - url: /
     description: This server
@@ -51,6 +55,8 @@ paths:
     get:
       summary: List work stems
       operationId: listWorks
+      parameters:
+        - $ref: "#/components/parameters/cex"
       responses:
         "200":
           description: OK
@@ -62,6 +68,8 @@ paths:
     get:
       summary: Parsed catalog entries (incl. synthetic entries for plain-text works)
       operationId: getCatalog
+      parameters:
+        - $ref: "#/components/parameters/cex"
       responses:
         "200":
           description: OK
@@ -75,6 +83,7 @@ paths:
       operationId: expandURNs
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
       responses:
         "200":
           description: OK
@@ -88,6 +97,7 @@ paths:
       operationId: navFirst
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
         - $ref: "#/components/parameters/normalize"
       responses:
         "200": { $ref: "#/components/responses/Nodes" }
@@ -98,6 +108,7 @@ paths:
       operationId: navLast
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
         - $ref: "#/components/parameters/normalize"
       responses:
         "200": { $ref: "#/components/responses/Nodes" }
@@ -108,6 +119,7 @@ paths:
       operationId: navPrevious
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
         - $ref: "#/components/parameters/normalize"
       responses:
         "200": { $ref: "#/components/responses/Nodes" }
@@ -118,6 +130,7 @@ paths:
       operationId: navNext
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
         - $ref: "#/components/parameters/normalize"
       responses:
         "200": { $ref: "#/components/responses/Nodes" }
@@ -128,6 +141,7 @@ paths:
       operationId: hashPassage
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
         - $ref: "#/components/parameters/algorithm"
         - $ref: "#/components/parameters/normalize"
       responses:
@@ -145,6 +159,7 @@ paths:
       operationId: getPassage
       parameters:
         - $ref: "#/components/parameters/URN"
+        - $ref: "#/components/parameters/cex"
         - $ref: "#/components/parameters/normalize"
         - $ref: "#/components/parameters/clip"
         - $ref: "#/components/parameters/context"
@@ -169,6 +184,12 @@ components:
       description: CTS URN (exact, prefix, `a-b` range, or `...@needle[n]` anchor).
       schema: { type: string }
       example: "urn:cts:greekLit:tlg0016.tlg001.grc:1.1"
+    cex:
+      name: cex
+      in: query
+      description: Select a CEX file when `cex_source` is a directory base (e.g. `million`). Equivalent to the `/{CEX}/…` path prefix.
+      schema: { type: string }
+      example: million
     normalize:
       name: normalize
       in: query

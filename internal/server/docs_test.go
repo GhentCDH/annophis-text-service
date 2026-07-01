@@ -32,7 +32,7 @@ func TestDocsEndpoints(t *testing.T) {
 		t.Fatalf("/openapi.yaml status=%d", rec.Code)
 	}
 	spec := rec.Body.String()
-	for _, want := range []string{"openapi: 3.0.3", "/texts/{URN}", "/texts/hash/{URN}", "HashResponse"} {
+	for _, want := range []string{"openapi: 3.0.3", "/texts/{URN}", "/texts/hash/{URN}", "HashResponse", "name: cex"} {
 		if !strings.Contains(spec, want) {
 			t.Fatalf("/openapi.yaml missing %q", want)
 		}
