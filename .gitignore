@@ -11,9 +11,6 @@
 # the build itself
 /annophis-text-service
 
-# Go module files (auto-managed)
-go.sum
-
 # Local environment files
 .env
 .env.*

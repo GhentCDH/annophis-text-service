@@ -1,0 +1,8 @@
+github.com/ThomasK81/gocite v0.0.0-20200703112544-785f5b9bd278 h1:BKOanFOC9hCpw5KmHiJOvNpyEM0uHY5HVpNz0NLufks=
+github.com/ThomasK81/gocite v0.0.0-20200703112544-785f5b9bd278/go.mod h1:Y0KrHgz5VG09rUAQ5ZOYNTu++VqEgUS3i15Q82Kmkv4=
+github.com/go-chi/chi/v5 v5.2.3 h1:WQIt9uxdsAbgIYgid+BpYc+liqQZGMHRaUwp0JUcvdE=
+github.com/go-chi/chi/v5 v5.2.3/go.mod h1:L2yAIGWB3H+phAw1NxKwWM+7eUH/lU8pOMm5hHcoops=
+github.com/go-chi/cors v1.2.2 h1:Jmey33TE+b+rB7fT8MUy1u0I4L+NARQlK6LhzKPSyQE=
+github.com/go-chi/cors v1.2.2/go.mod h1:sSbTewc+6wYHBBCW7ytsFSn836hqM7JxpglAy2Vzc58=
+golang.org/x/text v0.31.0 h1:aC8ghyu4JhP8VojJ2lEHBnochRno1sgL6nEi9WGFGMM=
+golang.org/x/text v0.31.0/go.mod h1:tKRAlv61yKIjGGHX/4tP1LTbc13YSec1pxVEWXzfoeM=
