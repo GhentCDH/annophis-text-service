@@ -1,3 +1,4 @@
+[![CI](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml/badge.svg)](https://github.com/GhentCDH/annophis-text-service/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/GhentCDH/annophis-text-service)](https://goreportcard.com/report/github.com/GhentCDH/annophis-text-service)
 
 # annophis-text-service
