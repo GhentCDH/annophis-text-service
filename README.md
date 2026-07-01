@@ -21,6 +21,7 @@ This project is a **modernisation** of the CITE Architecture’s microservices: 
 * **Anchored URNs:** `urn:...:<ref>@needle[n]` (or `@/regex/`) and **ranges with anchors**.
 * **Unicode normalization** of responses via `?normalize=` (`nfc` default, `nfd`, `nfkc`, `nfkd`, `strip`) — see [Text encoding & normalization](#text-encoding--normalization).
 * **Content hashing:** `/texts/hash/{URN}` (per-node SHA-1/SHA-256 fingerprint of the resolved text), also available inline via `?hash=true` / `?meta=true`.
+* **Plain-text ingestion:** point `txt_data` at a directory of `.txt` files to serve them as line-based works through the full API — see [Plain-text ingestion](#plain-text-ingestion).
 * **No ellipses are inserted** into text; if content is clipped/truncated, responses include `complete: false`.
 * **CORS** via the `ORIGIN_ALLOWED` environment variable.
 
@@ -73,7 +74,8 @@ cp config.example.json config.json
   "host": "0.0.0.0",
   "port": ":8080",
   "cex_source": "https://cdn.jsdelivr.net/gh/ThomasK81/CTSTextservice@master/cex/",
-  "test_cex_source": "https://cdn.jsdelivr.net/gh/ThomasK81/CTSTextservice@master/cex/million.cex"
+  "test_cex_source": "https://cdn.jsdelivr.net/gh/ThomasK81/CTSTextservice@master/cex/million.cex",
+  "txt_data": ""
 }
 ```
 
@@ -84,11 +86,64 @@ The Docker image bakes in `config.example.json` as its default `/app/config.json
 
     * Path prefix: `/{CEX}/texts/...` (example: `/million/texts`)
     * Or query: `?cex=million`
+* `txt_data` — optional directory of **plain-text works** served alongside CEX (see [Plain-text ingestion](#plain-text-ingestion)). Leave empty to disable.
 
 Environment variables:
 
 * `CONFIG` — path to the config file (default `/app/config.json` in Docker).
 * `ORIGIN_ALLOWED` — comma-separated list of allowed origins for CORS (example: `http://localhost:5173`).
+
+---
+
+## Plain-text ingestion
+
+Set `txt_data` to a directory of plain `.txt` transcriptions and they become
+first-class works, queryable through the **entire API** (list, passage, prefix,
+range, anchored, navigation, catalog, hash) — no CEX authoring required. This is
+aimed at line-based corpora such as EVWRIT.
+
+### Layout
+
+A **namespace subdirectory** is required; each `.txt` file is a work:
+
+```
+txt_data/
+└─ evwrit/                 # → CTS namespace
+   └─ p_oxy_1234.txt       # → work
+```
+
+### URN derivation
+
+Each **non-empty line** becomes a citable node with a consecutive, 1-based line
+number:
+
+```
+urn:cts:evwrit:p_oxy_1234.txtparsed:1
+urn:cts:evwrit:p_oxy_1234.txtparsed:2
+urn:cts:evwrit:p_oxy_1234.txtparsed:3
+```
+
+So the URN is `urn:cts:<subdir>:<filename-without-.txt>.txtparsed:<line>`. The
+`.txtparsed` marker makes the origin explicit. Line text is stored NFC (like
+CEX), untrimmed.
+
+### Behaviour
+
+* **Empty lines are skipped**; surviving lines are numbered consecutively (no
+  gaps).
+* **On-the-fly** parsing with a modification-time check: a file is re-read only
+  when it (or the file set) changes — no restart needed.
+* **Best-effort CEX:** when `txt_data` is set, plain-text works still resolve
+  even if the configured `cex_source` is unavailable. (With `txt_data` empty,
+  CEX behaviour is unchanged.)
+* `/texts/catalog` includes a **synthetic entry** per file
+  (`citationScheme: "line"`, `groupName` = namespace, `workTitle` = filename).
+
+```bash
+curl http://127.0.0.1:8080/texts/urn:cts:evwrit:p_oxy_1234.txtparsed:3
+curl http://127.0.0.1:8080/texts/urn:cts:evwrit:p_oxy_1234.txtparsed:1-5
+curl http://127.0.0.1:8080/texts/hash/urn:cts:evwrit:p_oxy_1234.txtparsed:3
+```
 
 ---
 

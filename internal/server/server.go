@@ -21,6 +21,7 @@ type Server struct {
 	cfg        ServerConfig
 	httpClient *http.Client
 	cache      *cexCache
+	txt        *txtCache
 }
 
 type cexCache struct {
@@ -56,6 +57,7 @@ func NewServer(cfg ServerConfig) *Server {
 			data: make(map[string]cacheEntry),
 			ttl:  2 * time.Minute,
 		},
+		txt: &txtCache{},
 	}
 }
 
