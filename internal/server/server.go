@@ -151,7 +151,7 @@ func (s *Server) getContent(ctx context.Context, u string) ([]byte, error) {
 
 func BuildRouter(s *Server) http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Logger, middleware.Recoverer, middleware.Timeout(30*time.Second))
+	r.Use(middleware.RequestID, middleware.Logger, middleware.Recoverer, middleware.Timeout(30*time.Second))
 
 	origins := strings.Split(strings.TrimSpace(os.Getenv("ORIGIN_ALLOWED")), ",")
 	r.Use(cors.Handler(cors.Options{
