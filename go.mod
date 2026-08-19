@@ -8,4 +8,4 @@ require (
 	github.com/go-chi/cors v1.2.2
 )
 
-require golang.org/x/text v0.38.0
+require golang.org/x/text v0.41.0
